@@ -35,8 +35,7 @@ define(["qlik"
 			paint: function ($element, layout) {
 				try {
 
-					console.log("Paint");
-					//console.log({ layout });
+					console.log({ layout });
 					//console.log("Hypercube", layout.qHyperCube);
 					const that = this;
 					const app = qlik.currApp();
@@ -46,12 +45,7 @@ define(["qlik"
 
 					if (countTempRows() < totalRowCount) {
 						console.log("Get next Datapage");
-						const requestPage = [{
-							qTop: 1000,
-							qLeft: 0,
-							qWidth: 10,
-							qHeight: 1000
-						}];
+						const requestPage = calculateRequestPage(layout);
 						that.backendApi.getData(requestPage).then((dataPages) => {
 							console.log("Datapages", dataPages);
 							that.paint($element, layout);
@@ -62,6 +56,22 @@ define(["qlik"
 					updateHTML();
 					//needed for export
 					//return qlik.Promise.resolve();
+					function calculateRequestPage(layout) {
+						const rowsLoaded = countTempRows();
+						const qSize = layout.qHyperCube.qSize;
+						const qWidth = qSize.qcx;
+						const qHeight = Math.min(Math.floor(10000 / qWidth), qSize.qcy - rowsLoaded);
+						const qTop = rowsLoaded;
+						const requestPage = [{
+							qTop,
+							qLeft: 0,
+							qWidth,
+							qHeight,
+						}];
+						console.log("Load " + qHeight + " more data rows.");
+						console.log("Requestpage", requestPage);
+						return requestPage;
+					}
 					function countTempRows() {
 						let rowCount = 0;
 						layout.qHyperCube.qDataPages.forEach(qDataPage => {
