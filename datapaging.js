@@ -29,49 +29,100 @@ define(["qlik"
 					measures: {
 						uses: "measures",
 						min: 0,
-					}
+					},
+					dataPaging: {
+						type: "string",
+						component: "dropdown",
+						label: "Data paging type",
+						ref: "props.datapagingType",
+						options: [{
+							value: "backendApiGetData",
+							label: "backendApi.getData()",
+						}, {
+							value: "appCreateCube",
+							label: "app.createCube()",
+						}]
+					},
 				}
 			},
 			paint: function ($element, layout) {
 				try {
-
-					console.log({ layout });
-					//console.log("Hypercube", layout.qHyperCube);
 					const that = this;
-					const app = qlik.currApp();
+					const extensionId = layout.qInfo.qId;
 
-					const hyperCubeSize = 10000;
+					const datapagingType = layout.props.datapagingType;
 					const totalRowCount = that.backendApi.getRowCount();
 
-					if (countTempRows() < totalRowCount) {
-						console.log("Get next Datapage");
-						const requestPage = calculateRequestPage(layout);
-						that.backendApi.getData(requestPage).then((dataPages) => {
-							console.log("Datapages", dataPages);
-							that.paint($element, layout);
-							updateHTML();
-						})
+
+					if (datapagingType === "backendApiGetData") {
+						getDataByBackendApi(totalRowCount);
+					} else if (datapagingType === "appCreateCube") {
+						const app = qlik.currApp();
+						that.backendApi.getProperties().then(props => {
+							console.log("Props", props);
+							getDataByAppCreateCube(app, props.qHyperCubeDef, layout, totalRowCount, 0);
+						});
 					}
-					//add your rendering code here
+
 					updateHTML();
-					//needed for export
-					//return qlik.Promise.resolve();
+
 					function calculateRequestPage(layout) {
 						const rowsLoaded = countTempRows();
-						const qSize = layout.qHyperCube.qSize;
-						const qWidth = qSize.qcx;
+						const qSize = layout.qHyperCube.qSize; // Total size (rows*columns) of the hypercube
+						const qWidth = qSize.qcx; // Number of columns: # of dimensions + # of measures
 						const qHeight = Math.min(Math.floor(10000 / qWidth), qSize.qcy - rowsLoaded);
-						const qTop = rowsLoaded;
+						const qTop = rowsLoaded; // Last loaded rows
 						const requestPage = [{
 							qTop,
 							qLeft: 0,
 							qWidth,
 							qHeight,
 						}];
-						console.log("Load " + qHeight + " more data rows.");
-						console.log("Requestpage", requestPage);
 						return requestPage;
 					}
+
+					function getDataByBackendApi(totalRowCount) {
+						if (layout.qHyperCube.qDataPages.length === 1) {
+							layout.props.timeStart = Date.now();
+							layout.props.timeEnd = Date.now();
+						}
+						if (countTempRows() < totalRowCount) {
+							const requestPage = calculateRequestPage(layout);
+							that.backendApi.getData(requestPage).then((dataPages) => {
+								layout.props.timeEnd = Date.now();
+								that.paint($element, layout);
+								updateHTML(countTempRows());
+							})
+						} else {
+							console.log("Finished loading data: ", layout);
+						}
+					}
+
+					function getDataByAppCreateCube(app, hyperCubeDef, layout, totalRowCount, qTop) {
+						if (qTop === 0) {
+							layout.props.timeStart = Date.now();
+							layout.props.timeEnd = Date.now();
+						}
+						const qSize = layout.qHyperCube.qSize; // Total size (rows*columns) of the hypercube
+						const qWidth = qSize.qcx; // Number of columns: # of dimensions + # of measures
+						const qHeight = Math.floor(10000 / qWidth);
+						let dataFetch = [{
+							qTop,
+							qLeft: 0,
+							qWidth,
+							qHeight,
+						}];
+						hyperCubeDef.qInitialDataFetch = dataFetch; // Override qInitialDataFetch here
+						app.createCube(hyperCubeDef, reply => {
+							console.log("Reply", qTop, reply);
+							if (qTop + qHeight <= totalRowCount) {
+								layout.props.timeEnd = Date.now();
+								updateHTML(reply.qHyperCube.qDataPages[0].qArea.qTop + reply.qHyperCube.qDataPages[0].qArea.qHeight);
+								getDataByAppCreateCube(app, hyperCubeDef, layout, totalRowCount, qTop + qHeight);
+							}
+						});
+					}
+
 					function countTempRows() {
 						let rowCount = 0;
 						layout.qHyperCube.qDataPages.forEach(qDataPage => {
@@ -79,9 +130,33 @@ define(["qlik"
 						});
 						return rowCount;
 					}
-					function updateHTML() {
-						console.log("UpdateHTML", countTempRows());
-						$element.html("Rowcount: " + countTempRows() + "/" + totalRowCount);
+
+					function updateHTML(tempRowCount) {
+						let loadingStrategy = "";
+						switch (datapagingType) {
+							case "backendApiGetData":
+								loadingStrategy = "<a href='https://bit.ly/2EZ3nVS' target='_blank'>backendApi.getData()</a>";
+								break;
+							case "appCreateCube":
+								loadingStrategy = "<a href='https://bit.ly/2P6ks4B' target='_blank'>app.createCube()</a>";
+								break;
+						}
+						let html = "";
+						html += "Loading strategy: " + loadingStrategy + " . </br>";
+						html += "Rowcount: " + tempRowCount + "/" + totalRowCount + " loaded. </br>";
+						html += "Took " + (Math.max(0, layout.props.timeEnd - layout.props.timeStart)) + " ms.";
+						$element.html(html);
+						$element.css({
+							position: "relative",
+							background: "white",
+							color: "#888",
+							display: "inline-block",
+							"border-radius": "5px",
+							padding: "8px",
+							"font-size": "32px",
+							"font-family": "Arial",
+							"z-index": 1000,
+						});
 					}
 				} catch (e) { console.error(e) }
 			}
