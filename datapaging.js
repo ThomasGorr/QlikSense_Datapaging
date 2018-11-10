@@ -161,7 +161,7 @@ define(["qlik"
 						if (datapagingType === "appCreateCube") {
 							html += " and created";
 						} else {
-							html += "by just 1 created cube";
+							html += " by just 1 created cube";
 						}
 						html += ": " + Math.ceil(totalRowCount / numberOfRowsPerCube) + ". </br>";
 						html += "Took " + (Math.max(0, layout.props.timeEnd - layout.props.timeStart)) + " ms.";
