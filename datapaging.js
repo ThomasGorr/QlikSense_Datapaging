@@ -55,7 +55,8 @@ define(["qlik"
 
 					if (datapagingType === "backendApiGetData") {
 						const qSize = layout.qHyperCube.qSize;
-						getDataByBackendApi(totalRowCount, qSize);
+						const b = new backendApiGetData(that, layout, $element);
+						b.getDataByBackendApi(totalRowCount, qSize);
 					} else if (datapagingType === "appCreateCube") {
 						layout.props.timeStart = Date.now();
 						layout.props.timeEnd = Date.now();
@@ -68,39 +69,7 @@ define(["qlik"
 					}
 
 
-					function calculateRequestPage(layout) {
-						const rowsLoaded = countTempRows();
-						const qSize = layout.qHyperCube.qSize; // Total size (rows*columns) of the hypercube
-						const qWidth = qSize.qcx; // Number of columns: # of dimensions + # of measures
-						const qHeight = Math.min(Math.floor(10000 / qWidth), qSize.qcy - rowsLoaded);
-						const qTop = rowsLoaded; // Last loaded rows
-						const requestPage = [{
-							qTop,
-							qLeft: 0,
-							qWidth,
-							qHeight,
-						}];
-						return requestPage;
-					}
 
-					function getDataByBackendApi(totalRowCount, qSize) {
-						if (layout.qHyperCube.qDataPages.length === 1) {
-							layout.props.timeStart = Date.now();
-							layout.props.timeEnd = Date.now();
-							updateHTML(countTempRows(), qSize);
-						}
-						if (countTempRows() < totalRowCount) {
-							const requestPage = calculateRequestPage(layout);
-							that.backendApi.getData(requestPage).then((dataPages) => {
-								layout.props.timeEnd = Date.now();
-								that.paint($element, layout);
-								updateHTML(countTempRows(), qSize);
-							})
-						} else {
-							console.log("Finished loading data: ", layout);
-							return;
-						}
-					}
 
 					function getDataByAppCreateCube(app, hyperCubeDef, layout, totalRowCount, numberOfCubesToFetch, numberOfFetchedCubes, qTop) {
 						console.log("Cubes fetched: " + numberOfFetchedCubes);
@@ -134,53 +103,107 @@ define(["qlik"
 						}
 					}
 
-					function countTempRows() {
-						let rowCount = 0;
-						layout.qHyperCube.qDataPages.forEach(qDataPage => {
-							rowCount += qDataPage.qMatrix.length;
-						});
-						return rowCount;
-					}
-
-					function updateHTML(tempRowCount, qSize) {
-						let loadingStrategy = "";
-						const numberOfRowsPerCube = Math.floor(10000 / qSize.qcx);
-						switch (datapagingType) {
-							case "backendApiGetData":
-								loadingStrategy = "<a href='https://bit.ly/2EZ3nVS' target='_blank'>backendApi.getData()</a>";
-								break;
-							case "appCreateCube":
-								loadingStrategy = "<a href='https://bit.ly/2P6ks4B' target='_blank'>app.createCube()</a>";
-								break;
-						}
-						let html = "";
-						html += "Loading strategy: " + loadingStrategy + " . </br>";
-						html += "Row count: " + tempRowCount + "/" + totalRowCount + " loaded. </br>";
-						html += "Number of columns: " + qSize.qcx + " => rows per fetch: " + numberOfRowsPerCube + ".</br>";
-						html += "Number of cubes to be fetched";
-						if (datapagingType === "appCreateCube") {
-							html += " and created";
-						} else {
-							html += " by just 1 created cube";
-						}
-						html += ": " + Math.ceil(totalRowCount / numberOfRowsPerCube) + ". </br>";
-						html += "Took " + (Math.max(0, layout.props.timeEnd - layout.props.timeStart)) + " ms.";
-						$element.html(html);
-						$element.css({
-							position: "relative",
-							background: "white",
-							color: "#888",
-							display: "inline-block",
-							"border-radius": "5px",
-							padding: "8px",
-							"font-size": "32px",
-							"font-family": "Arial",
-							"z-index": 1000,
-						});
-					}
 				} catch (e) { console.error(e) }
 			}
 		};
 
 	});
 
+class backendApiGetData {
+
+	constructor(that, layout, $element) {
+		this.that = that;
+		this.layout = layout;
+		this.$element = $element;
+	}
+
+	calculateRequestPage(layout) {
+		const rowsLoaded = this.countTempRows();
+		const qSize = layout.qHyperCube.qSize; // Total size (rows*columns) of the hypercube
+		const qWidth = qSize.qcx; // Number of columns: # of dimensions + # of measures
+		const qHeight = Math.min(Math.floor(10000 / qWidth), qSize.qcy - rowsLoaded);
+		const qTop = rowsLoaded; // Last loaded rows
+		const requestPage = [{
+			qTop,
+			qLeft: 0,
+			qWidth,
+			qHeight,
+		}];
+		return requestPage;
+	}
+
+	countTempRows() {
+		let rowCount = 0;
+		this.layout.qHyperCube.qDataPages.forEach(qDataPage => {
+			rowCount += qDataPage.qMatrix.length;
+		});
+		return rowCount;
+	}
+
+
+	getDataByBackendApi(totalRowCount, qSize) {
+		const html = new htmlUpdater(this.layout, this.$element, "backendApiGetData");
+		if (this.layout.qHyperCube.qDataPages.length === 1) {
+			this.layout.props.timeStart = Date.now();
+			this.layout.props.timeEnd = Date.now();
+			html.updateHTML(this.countTempRows(), totalRowCount, qSize);
+		}
+		if (this.countTempRows() < totalRowCount) {
+			const requestPage = this.calculateRequestPage(this.layout);
+			this.that.backendApi.getData(requestPage).then((dataPages) => {
+				this.layout.props.timeEnd = Date.now();
+				this.that.paint(this.$element, this.layout);
+				html.updateHTML(this.countTempRows(), totalRowCount, qSize);
+			})
+		} else {
+			console.log("Finished loading data: ", this.layout);
+			return;
+		}
+	}
+}
+
+class htmlUpdater {
+
+	constructor(layout, $element, datapagingType) {
+		this.layout = layout;
+		this.$element = $element;
+		this.datapagingType = datapagingType;
+	}
+
+	updateHTML(tempRowCount, totalRowCount, qSize) {
+		let loadingStrategy = "";
+		const numberOfRowsPerCube = Math.floor(10000 / qSize.qcx);
+		switch (this.datapagingType) {
+			case "backendApiGetData":
+				loadingStrategy = "<a href='https://bit.ly/2EZ3nVS' target='_blank'>backendApi.getData()</a>";
+				break;
+			case "appCreateCube":
+				loadingStrategy = "<a href='https://bit.ly/2P6ks4B' target='_blank'>app.createCube()</a>";
+				break;
+		}
+		let html = "";
+		html += "Loading strategy: " + loadingStrategy + " . </br>";
+		html += "Row count: " + tempRowCount + "/" + totalRowCount + " loaded. </br>";
+		html += "Number of columns: " + qSize.qcx + " => rows per fetch: " + numberOfRowsPerCube + ".</br>";
+		html += "Number of cubes to be fetched";
+		if (this.datapagingType === "appCreateCube") {
+			html += " and created";
+		} else {
+			html += " by just 1 created cube";
+		}
+		html += ": " + Math.ceil(totalRowCount / numberOfRowsPerCube) + ". </br>";
+		html += "Took " + (Math.max(0, this.layout.props.timeEnd - this.layout.props.timeStart)) + " ms.";
+		this.$element.html(html);
+		this.$element.css({
+			position: "relative",
+			background: "white",
+			color: "#888",
+			display: "inline-block",
+			"border-radius": "5px",
+			padding: "8px",
+			"font-size": "32px",
+			"font-family": "Arial",
+			"z-index": 1000,
+		});
+	}
+}
