@@ -4,11 +4,11 @@
 	"type": "visualization",
 	"version": "1.0.0",
 	"icon": "extension",
-	"author": "",
-	"homepage": "",
+	"author": "Thomas Gorr",
+	"homepage": "www.thomasgorr.de",
 	"keywords": "qlik-sense, visualization",
-	"license": "",
-	"repository": "",
+	"license": "MIT",
+	"repository": "https://github.com/ThomasGorr/QlikSense_Datapaging/blob/master/datapaging.qext",
 	"dependencies": {
 		"qlik-sense": ">=3.0.x"
 	}
