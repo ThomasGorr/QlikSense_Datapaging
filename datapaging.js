@@ -74,6 +74,10 @@ define(["qlik"
 
 	});
 
+/**
+ * Class for retrieving data from click by using app.createCube()
+ * @see https://help.qlik.com/en-US/sense-developer/November2018/Subsystems/APIs/Content/Sense_ClientAPIs/CapabilityAPIs/AppAPI/createCube-method.htm
+ */
 class appCreateCube {
 
 	constructor(app, hyperCubeDef, layout, $element, totalRowCount) {
@@ -86,6 +90,12 @@ class appCreateCube {
 		this.html = new htmlUpdater(this.layout, this.$element, "appCreateCube");
 	}
 
+	/**
+	 * Creates a new hypercube and then gets a specific hypercube-slice of it which is calculated in dataFetch object.
+	 * @param {} numberOfCubesToFetch Number of cubes that must be fetched to receive all data for the current selection.
+	 * @param {} numberOfFetchedCubes Numer of all fetched cubes.
+	 * @param {} qTop The index of the last loaded row from a previous hypercube call.
+	 */
 	getDataByAppCreateCube(numberOfCubesToFetch, numberOfFetchedCubes, qTop) {
 		if (numberOfFetchedCubes < numberOfCubesToFetch) {
 			const qSize = this.layout.qHyperCube.qSize; // Total size (rows*columns) of the hypercube
@@ -118,6 +128,10 @@ class appCreateCube {
 	}
 }
 
+/**
+ * Class for retrieving data from click by using backendApi.getData()
+ * @see https://help.qlik.com/en-US/sense-developer/November2018/Subsystems/APIs/Content/Sense_ClientAPIs/BackendAPI/getdata-method.htm
+ */
 class backendApiGetData {
 
 	constructor(that, layout, $element) {
@@ -127,6 +141,10 @@ class backendApiGetData {
 		this.html = new htmlUpdater(this.layout, this.$element, "backendApiGetData");
 	}
 
+	/**
+	 * Recalculates the requestpage for the next hypercube-slice from backendApi.getData().
+	 * @param {*} layout Qlik Sense extension layout.
+	 */
 	calculateRequestPage(layout) {
 		const rowsLoaded = this.countTempRows();
 		const qSize = layout.qHyperCube.qSize; // Total size (rows*columns) of the hypercube
@@ -142,6 +160,9 @@ class backendApiGetData {
 		return requestPage;
 	}
 
+	/**
+	 * Counts the temporary loaded number of rows by summing up the number of all qDataPages-rows.
+	 */
 	countTempRows() {
 		let rowCount = 0;
 		this.layout.qHyperCube.qDataPages.forEach(qDataPage => {
@@ -150,7 +171,12 @@ class backendApiGetData {
 		return rowCount;
 	}
 
-
+	/**
+	 * Gets a specific hypercube-slice from backendApi.
+	 * Additionally updates the HTML with performance data like taken time and current number of data rows that has been fetched.
+	 * @param {} totalRowCount The total number of rows for the current seleciton.
+	 * @param {} qSize The total number of columns and rows for the current selection.
+	 */
 	getDataByBackendApi(totalRowCount, qSize) {
 		if (this.layout.qHyperCube.qDataPages.length === 1) {
 			this.layout.props.timeStart = Date.now();
@@ -171,6 +197,9 @@ class backendApiGetData {
 	}
 }
 
+/**
+ * Class that supports a HTML-updater for backendApi.getData- and app.createCube-strategies.
+ */
 class htmlUpdater {
 
 	constructor(layout, $element, datapagingType) {
@@ -179,6 +208,12 @@ class htmlUpdater {
 		this.datapagingType = datapagingType;
 	}
 
+	/**
+	 * Updates the HTML of the extension after each hypcercube call.
+	 * @param {} tempRowCount The currently loaded number of rows.
+	 * @param {} totalRowCount The total number of rows for the current selection.
+	 * @param {} qSize The total number of columns and rows for the current selection.
+	 */
 	updateHTML(tempRowCount, totalRowCount, qSize) {
 		let loadingStrategy = "";
 		const numberOfRowsPerCube = Math.floor(10000 / qSize.qcx);
