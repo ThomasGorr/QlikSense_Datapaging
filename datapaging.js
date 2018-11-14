@@ -52,10 +52,11 @@ define(["qlik"
 					const datapagingType = layout.props.datapagingType;
 					const totalRowCount = that.backendApi.getRowCount();
 
+					// Determine which data loading strategie has to run
 					if (datapagingType === "backendApiGetData") {
 						const qSize = layout.qHyperCube.qSize;
-						const b = new backendApiGetData(that, layout, $element);
-						b.getDataByBackendApi(totalRowCount, qSize);
+						const getData = new backendApiGetData(that, layout, $element);
+						getData.getDataByBackendApi(totalRowCount, qSize);
 					} else if (datapagingType === "appCreateCube") {
 						layout.props.timeStart = Date.now();
 						layout.props.timeEnd = Date.now();
